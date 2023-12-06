@@ -5,7 +5,7 @@ from model.ResNet50 import ResNet50
 
 class RetinaNet(nn.Module):
     def __init__(self, backbone='resnet50'):
-        super(RetinaNet, self).__init__()
+        super().__init__()
 
         self.fpn_feature_size = 256
 

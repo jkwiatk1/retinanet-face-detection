@@ -1,6 +1,7 @@
 # RetinaNet for Face Detection
 * white paper: [link](https://arxiv.org/pdf/1708.02002v2.pdf)
 * article: [link](https://towardsdatascience.com/review-retinanet-focal-loss-object-detection-38fba6afabe4)
+* pytorch_use: [link](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.retinanet_resnet50_fpn.html#torchvision.models.detection.retinanet_resnet50_fpn)
 
 ## ResNet50
 Backbone created using the PyTorch model with pre-trained weights. 
@@ -12,6 +13,8 @@ Created based on:
 * article_2: [link](https://towardsdatascience.com/review-fpn-feature-pyramid-network-object-detection-262fc7482610)
 * article_3: [link](https://medium.com/@freshtechyy/fusing-backbone-features-using-feature-pyramid-network-fpn-c652aa6a264b)
 
+Low resolution feature maps capture more global information of the image and represent richer semantic meaning while the high resolution feature maps focus more on the local information and provide more accurate spatial information. 
+The goal of FPN is to combine the high and low resolution feature maps to enhance the features with both accurate spatial information and rich semantic meaning. 
 FPN extracts feature maps and later feeds into a detector, like RPN.
 
 ## Region Proposal Network 
