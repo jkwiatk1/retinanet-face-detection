@@ -28,9 +28,7 @@ class FeaturesPyramid(nn.Module):
         p4_o = self.P4(c4)
         p3_o = self.P3(c3)
 
-        p5_o_upsampled = self.P5_upsample_2x(p5_o)
-        p4_o = self.P4_reduce_aliasing(p5_o_upsampled + p4_o)
-        p4_o_upsampled = self.P4_upsample_2x(p4_o)
-        p3_o = self.P3_reduce_aliasing(p4_o_upsampled + p3_o)
+        p4_o = self.P4_reduce_aliasing(self.P5_upsample_2x(p5_o) + p4_o)
+        p3_o = self.P3_reduce_aliasing(self.P4_upsample_2x(p4_o) + p3_o)
 
         return [p3_o, p4_o, p5_o, p6_o, p7_o]
