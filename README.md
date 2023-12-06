@@ -10,7 +10,8 @@ Created based on:
 * white paper: [link](https://openaccess.thecvf.com/content_cvpr_2017/papers/Lin_Feature_Pyramid_Networks_CVPR_2017_paper.pdf)
 * article_1: [link](https://jonathan-hui.medium.com/understanding-feature-pyramid-networks-for-object-detection-fpn-45b227b9106c)
 * article_2: [link](https://towardsdatascience.com/review-fpn-feature-pyramid-network-object-detection-262fc7482610)
-  
+* article_3: [link](https://medium.com/@freshtechyy/fusing-backbone-features-using-feature-pyramid-network-fpn-c652aa6a264b)
+
 FPN extracts feature maps and later feeds into a detector, like RPN.
 
 ## Region Proposal Network 
