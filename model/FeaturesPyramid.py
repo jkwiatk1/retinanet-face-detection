@@ -17,8 +17,15 @@ class FeaturesPyramid(nn.Module):
         self.P4_reduce_aliasing = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
         self.P3_reduce_aliasing = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
 
-    def forward(self, inputs):
-        c3, c4, c5 = inputs
+    def forward(self, inputs: List[int]):
+        '''
+        :param inputs: feature maps from backbone c3-c5 layers
+        :return: p3-p7: enhanced features maps
+        '''
+        if len(inputs) == 3:
+            c3, c4, c5 = inputs
+        else:
+            raise ValueError(f"The number of elements in the `inputs` parameter should be 3 but is {len(inputs)}.")
 
         p6_o = self.P6(c5)
         p7_o = nn.ReLU()(p6_o)

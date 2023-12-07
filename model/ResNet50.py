@@ -22,7 +22,7 @@ class ResNet50(nn.Module):
         x = self.relu(x)
         x = self.maxpool(x)
         x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-        return x
+        c3 = self.layer2(x)
+        c4 = self.layer3(c3)
+        c5 = self.layer4(c4)
+        return c3, c4, c5
