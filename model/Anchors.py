@@ -134,24 +134,25 @@ def anchors_for_shape(image_shape, pyramid_levels=None, ratios=None, scales=None
     return all_anchors
 
 
-'''
-image_shape = (800, 1200)
-pyramid_levels = [3, 4, 5, 6, 7]
-ratios = np.array([0.5, 1, 2])
-scales = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
-strides = [2 ** x for x in pyramid_levels]
-sizes = [2 ** (x + 2) for x in pyramid_levels]
-generated_anchors = anchors_for_shape(image_shape=(800, 1200), pyramid_levels=pyramid_levels,
-                                      ratios=ratios, scales=scales, strides=strides, sizes=sizes)
-print("Generated Anchors:")
-print(generated_anchors)
-'''
-# print(shift((5, 5), stride=2, anchors=np.array([[0, 0, 10, 10], [0, 0, 20, 20]])))
-# print(generate_anchor_boxes(16))
+def tests():
+    image_shape = (800, 1200)
+    pyramid_levels = [3, 4, 5, 6, 7]
+    ratios = np.array([0.5, 1, 2])
+    scales = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
+    strides = [2 ** x for x in pyramid_levels]
+    sizes = [2 ** (x + 2) for x in pyramid_levels]
+    generated_anchors = anchors_for_shape(image_shape=(800, 1200), pyramid_levels=pyramid_levels,
+                                          ratios=ratios, scales=scales, strides=strides, sizes=sizes)
+    print("Shape of generated Anchors:")
+    print(generated_anchors.shape)
 
-'''
-anchors = Anchors()
-input_tensor = torch.randn((1, 3, 224, 224))  # Przykładowy tensor wejściowy
-boxes = anchors(input_tensor)
-print(boxes[0])
-'''
+    print("Shifted boxes", shift((5, 5), stride=2, anchors=np.array([[0, 0, 10, 10]])))
+    print("Liczba anchor boxów: ", len(generate_anchor_boxes(16)))
+
+    anchors = Anchors()
+    input_tensor = torch.randn((1, 3, 224, 224))  # Przykładowy tensor wejściowy
+    boxes = anchors(input_tensor)
+    print(boxes.shape)
+
+if __name__ == "__main__":
+    tests()
