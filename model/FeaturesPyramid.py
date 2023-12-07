@@ -19,6 +19,10 @@ class FeaturesPyramid(nn.Module):
 
     def forward(self, inputs: List[int]):
         '''
+        P2 is not used due to computational reasons.
+        P6 is computed by strided convolution instead of downsampling.
+        P7 is included additionally to improve the accuracy of large object detection.
+
         :param inputs: feature maps from backbone c3-c5 layers
         :return: p3-p7: enhanced features maps
         '''
