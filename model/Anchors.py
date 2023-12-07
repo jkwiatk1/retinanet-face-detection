@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class Anchors(nn.Module):
@@ -32,18 +33,15 @@ class Anchors(nn.Module):
             self.scales = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
 
     def forward(self, image):
-        image_shape = image.shape[2:]
-        image_shape = np.array(image_shape)
-        image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in self.pyramid_levels]
+        shape = image.shape[2:]
+        shape = np.array(shape)
+        image_shapes = [(shape + 2 ** x - 1) // (2 ** x) for x in self.pyramid_levels]
 
-        # compute anchors over all pyramid levels
         all_anchors = np.zeros((0, 4)).astype(np.float32)
-
         for idx, p in enumerate(self.pyramid_levels):
-            anchors = generate_anchors(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
+            anchors = generate_anchor_boxes(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
             shifted_anchors = shift(image_shapes[idx], self.strides[idx], anchors)
             all_anchors = np.append(all_anchors, shifted_anchors, axis=0)
-
         all_anchors = np.expand_dims(all_anchors, axis=0)
 
         if torch.cuda.is_available():
@@ -91,8 +89,69 @@ def compute_shape(image_shape, pyramid_levels):
     return image_shapes
 
 
+def shift(shape, stride, anchors):
+    """
+    Przesuwa kotwice na siatkę punktów o określonym kroku.
+
+    Args:
+    - shape (tuple): Krotka zawierająca wysokość i szerokość siatki przesunięć
+    - stride (int): Kroki przesunięć na osiach X i Y dla generowania siatki punktów.
+    - anchors (numpy array): Tablica NumPy reprezentująca kotwice, czyli początkowe pudełka zakotwiczenia.
+
+    Returns:
+    - numpy array: Tablica NumPy reprezentująca wszystkie przesunięte kotwice na siatkę punktów.
+    """
+    shift_x = (np.arange(0, shape[1])) * stride
+    shift_y = (np.arange(0, shape[0])) * stride
+    x, y = np.meshgrid(shift_x, shift_y)
+    x = x.ravel()
+    y = y.ravel()
+    shifts = np.vstack((x, y, x, y)).transpose()
+    all_anchors = anchors.reshape((1, -1, 4)) + shifts.reshape((-1, 1, 4))
+    return all_anchors.reshape((-1, 4))
 
 
-#print(generate_anchor_boxes(16))
-#print(compute_shape([500, 500, 3], [1, 2, 3, 4, 5]))
+def anchors_for_shape(image_shape, pyramid_levels=None, ratios=None, scales=None,
+                      strides=None, sizes=None, shapes_callback=None):
+    """
+    Compute anchors for a given input shape and pyramid levels.
 
+    :param image_shape: Shape of the input image.
+    :param pyramid_levels: List of pyramid levels.
+    :param ratios: Array of anchor aspect ratios.
+    :param scales: Array of anchor scales.
+    :param strides: List of anchor strides corresponding to each pyramid level.
+    :param sizes: List of anchor sizes for each pyramid level.
+    :param shapes_callback: Callback function to compute shapes based on pyramid levels.
+    :return: Array of computed anchors.
+    """
+    image_shapes = compute_shape(image_shape, pyramid_levels)
+    all_anchors = np.zeros((0, 4))
+    for idx, p in enumerate(pyramid_levels):
+        anchors = generate_anchor_boxes(base_size=sizes[idx], ratios=ratios, scales=scales)
+        shifted_anchors = shift(image_shapes[idx], strides[idx], anchors)
+        all_anchors = np.append(all_anchors, shifted_anchors, axis=0)
+    return all_anchors
+
+
+'''
+image_shape = (800, 1200)
+pyramid_levels = [3, 4, 5, 6, 7]
+ratios = np.array([0.5, 1, 2])
+scales = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
+strides = [2 ** x for x in pyramid_levels]
+sizes = [2 ** (x + 2) for x in pyramid_levels]
+generated_anchors = anchors_for_shape(image_shape=(800, 1200), pyramid_levels=pyramid_levels,
+                                      ratios=ratios, scales=scales, strides=strides, sizes=sizes)
+print("Generated Anchors:")
+print(generated_anchors)
+'''
+# print(shift((5, 5), stride=2, anchors=np.array([[0, 0, 10, 10], [0, 0, 20, 20]])))
+# print(generate_anchor_boxes(16))
+
+'''
+anchors = Anchors()
+input_tensor = torch.randn((1, 3, 224, 224))  # Przykładowy tensor wejściowy
+boxes = anchors(input_tensor)
+print(boxes[0])
+'''
