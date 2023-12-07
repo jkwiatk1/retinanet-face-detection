@@ -28,3 +28,19 @@ class RetinaNet(nn.Module):
         c3, c4, c5 = self.Backbone(x)
         p3, p4, p5, p6, p7 = self.FPN([c3, c4, c5])
         return [p3, p4, p5, p6, p7]
+
+
+
+def local_some_test():
+    import torch
+    RetNet = RetinaNet()
+    input_tensor = torch.randn(1, 3, 512, 800)
+    print(input_tensor.size())
+    outputs_RN = RetNet(input_tensor)
+
+    for i, output in enumerate(outputs_RN):
+        print(f'Output P{i + 3} shape: {output.shape}')
+
+if __name__ == "__main__":
+    local_some_test()
+
