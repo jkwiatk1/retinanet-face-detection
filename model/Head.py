@@ -2,12 +2,13 @@ import torch.nn as nn
 
 
 class RegressionModel(nn.Module):
-    def __init__(self, in_feature_size, num_anchors=9, bias_init=None, feature_size=256):
+    def __init__(self, in_feature_size, num_anchors=9, feature_size=256, bias_init=None):
         """
         Args:
             :param in_feature_size: Number of input channels in the feature map.
             :param num_anchors: Number of anchors used for prediction.
             :param feature_size: Number of channels in intermediate layers.
+            :param bias_init: Bias Initializer for the final convolution layer.
         """
         super().__init__()
         self.head = build_head(in_feature_size, num_anchors * 4, bias_init, feature_size)
@@ -21,13 +22,14 @@ class RegressionModel(nn.Module):
 
 
 class ClassificationModel(nn.Module):
-    def __init__(self, in_feature_size, num_anchors=9, num_classes=1, bias_init=None, feature_size=256):
+    def __init__(self, in_feature_size, num_anchors=9, num_classes=1, feature_size=256, bias_init=None):
         """
         Args:
             :param in_feature_size: Number of input channels in the feature map.
             :param num_anchors: Number of anchors used for prediction.
             :param num_classes: Number of object classes.
             :param feature_size: Number of channels in intermediate layers.
+            :param bias_init: Bias Initializer for the final convolution layer.
         """
         super().__init__()
         self.num_anchors = num_anchors
@@ -89,9 +91,31 @@ def local_some_test():
     classification_output = classification_head(x)
     box_regression_output = box_regression_head(x)
 
-    print("Rozmiar wyjścia z głowy klasyfikacji:", classification_output.shape)
-    print("Rozmiar wyjścia z głowy regresji:", box_regression_output.shape)
+    print("Output size of the classification head:", classification_output.shape)
+    print("Output size of the regression head:", box_regression_output.shape)
+
+
+def test_with_bias():
+    import torch
+    import math
+
+    in_feature_size = 256
+    num_classes = 1
+    num_anchors = 9
+    prior_probability = 0.01
+
+    bias_init = nn.init.constant_(torch.empty(1), -math.log((1.0 - prior_probability) / prior_probability))
+    classification_head = ClassificationModel(in_feature_size, num_classes=num_classes, bias_init=bias_init)
+    box_regression_head = RegressionModel(in_feature_size, bias_init=0)
+
+    x = torch.randn(1, 256, 16, 25)
+    classification_output = classification_head(x)
+    box_regression_output = box_regression_head(x)
+
+    print("Output size of the classification head using bias:", classification_output.shape)
+    print("Output size of the regression head using bias:", box_regression_output.shape)
 
 
 if __name__ == "__main__":
     local_some_test()
+    test_with_bias()
