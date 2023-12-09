@@ -21,12 +21,10 @@ class RetinaNet(nn.Module):
 
         self.FPN = FeaturesPyramid(self.in_channels_size_list, out_channels=self.fpn_feature_size)
 
-        #TODO Init bias in heads  
-        bias_init = nn.init.constant_(torch.empty(1),
-                                      -math.log((1.0 - self.prior_probability) / self.prior_probability))
+        bias_init_cls  = -math.log((1.0 - self.prior_probability) / self.prior_probability)
         self.ClassificationModel = ClassificationModel(self.fpn_feature_size, num_classes=num_classes,
-                                                       bias_init=None)
-        self.RegressionModel = RegressionModel(self.fpn_feature_size, bias_init=None)
+                                                       bias_init=bias_init_cls )
+        self.RegressionModel = RegressionModel(self.fpn_feature_size, bias_init=0)
 
     def forward(self, x):
         '''
@@ -36,7 +34,7 @@ class RetinaNet(nn.Module):
         c3, c4, c5 = self.Backbone(x)
         fpn_features_map = self.FPN([c3, c4, c5])
 
-        # concatenation for all feature levels
+        # concatenation for all feature levels [p3,p4,p5,p6,p7]
         regression = torch.cat([self.RegressionModel(feature) for feature in fpn_features_map], dim=1)
 
         classification = torch.cat([self.ClassificationModel(feature) for feature in fpn_features_map], dim=1)
@@ -65,6 +63,9 @@ def test_output_from_head():
 
     print("Output size of the classification head:", output_class_RN.shape)
     print("Output size of the regression head:", output_regression_RN.shape)
+
+    print("Bias klasyfikacji:", RetNet.ClassificationModel.head[-1].bias.data)
+    print("Bias regresji:", RetNet.RegressionModel.head[-1].bias.data)
 
 
 if __name__ == "__main__":

@@ -72,8 +72,11 @@ def build_head(in_feature_size, output_filters, bias_init, feature_size=256):
         nn.ReLU(),
         nn.Conv2d(feature_size, feature_size, kernel_size=3, padding=1),
         nn.ReLU(),
-        nn.Conv2d(feature_size, output_filters, kernel_size=3, padding=1, bias=bias_init)
+        nn.Conv2d(feature_size, output_filters, kernel_size=3, padding=1)
     )
+
+    head[-1].bias.data.fill_(bias_init)
+
     return head
 
 
