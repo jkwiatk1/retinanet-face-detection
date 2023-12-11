@@ -4,6 +4,8 @@ import torch
 from model.FeaturesPyramid import FeaturesPyramid
 from model.ResNet50 import ResNet50
 from model.Head import ClassificationModel, RegressionModel
+from model.Anchors import Anchors
+from model.Loss import RetinaFocalLoss
 
 
 class RetinaNet(nn.Module):
@@ -21,23 +23,37 @@ class RetinaNet(nn.Module):
 
         self.FPN = FeaturesPyramid(self.in_channels_size_list, out_channels=self.fpn_feature_size)
 
-        bias_init_cls  = -math.log((1.0 - self.prior_probability) / self.prior_probability)
+        bias_init_cls = -math.log((1.0 - self.prior_probability) / self.prior_probability)
         self.ClassificationModel = ClassificationModel(self.fpn_feature_size, num_classes=num_classes,
-                                                       bias_init=bias_init_cls )
+                                                       bias_init=bias_init_cls)
         self.RegressionModel = RegressionModel(self.fpn_feature_size, bias_init=0)
+
+        self.anchors = Anchors()
+
+        self.FocalLoss = RetinaFocalLoss()
 
     def forward(self, x):
         '''
         :param x: input tensor
         :return:
         '''
-        c3, c4, c5 = self.Backbone(x)
+        if self.training:
+            img, annotations = x
+        else:
+            img = x
+
+        c3, c4, c5 = self.Backbone(img)
         fpn_features_map = self.FPN([c3, c4, c5])
 
         # concatenation for all feature levels [p3,p4,p5,p6,p7]
         regression = torch.cat([self.RegressionModel(feature) for feature in fpn_features_map], dim=1)
 
         classification = torch.cat([self.ClassificationModel(feature) for feature in fpn_features_map], dim=1)
+
+        anchors = self.anchors(img)
+
+        self.FocalLoss(annotations, classification)
+
 
         return regression, classification
 
