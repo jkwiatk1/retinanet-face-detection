@@ -21,8 +21,8 @@ class WiderFaceDataset(Dataset):
         self.boxes = []
         self.boxes_num = []
         self.parameters = []
+        datasets.WIDERFace(root=data_dir, split=split, transform=transform, download=True)
         self.image_paths = self._get_image_paths()
-        datasets.WIDERFace(root=data_dir, split=split, transform=transform, download=True)  # test/val
 
     def __len__(self):
         return len(self.image_paths)
@@ -196,6 +196,6 @@ def histogram2():
     plt.savefig("histogram_wider_height", bbox_inches='tight', pad_inches=0)
     plt.show()
 
-histogram()
+# histogram()
 
 
