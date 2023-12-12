@@ -1,38 +1,39 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.ops import box_iou
 
-class RetinaNetBoxLoss(nn.Module):
-    def __init__(self, delta):
-        """
-        Inicjalizacja funkcji straty RetinaNetBoxLoss.
 
-        Parametry:
-        - delta: Parametr określający próg, poniżej którego straty stają się kwadratowe.
-        """
-        super(RetinaNetBoxLoss, self).__init__()
-        self.delta = delta
+class RetinaNetBoxIoU(nn.Module):
+    def __init__(self):
+        super().__init__()
 
-    def forward(self, y_true, y_pred):
+    def forward(self, y_true, anchor):
         """
-        Metoda forward obliczająca stratę RetinaNetBoxLoss.
+        Metoda forward obliczająca wartosc iou
 
         Parametry:
         - y_true: Tensor z prawdziwymi boxami (ground truth), zawierającymi informacje o położeniu obiektów.
-        - y_pred: Tensor z przewidywanymi wartościami, które model ma zwrócić (przewidywane położenie obiektów).
+                    (x_srodek, y_srodek, szerokosc, wysokosc)
+        - anchor: Anchor box
 
         Zwraca:
-        - Tensor zawierający sumę strat dla każdego przykładu.
+        - wartosc iou
         """
-        difference = y_true - y_pred
-        absolute_difference = torch.abs(difference)
-        squared_difference = difference ** 2
-        loss = torch.where(absolute_difference < self.delta, 0.5 * squared_difference, absolute_difference - 0.5)
-        return torch.sum(loss, dim=-1)
+
+        box1_vertices = torch.zeros_like(y_true)
+        box1_vertices[:, 0] = y_true[:, 0] - 0.5 * y_true[:, 2]  # x1
+        box1_vertices[:, 1] = y_true[:, 1] - 0.5 * y_true[:, 3]  # y1
+        box1_vertices[:, 2] = y_true[:, 0] + 0.5 * y_true[:, 2]  # x2
+        box1_vertices[:, 3] = y_true[:, 1] + 0.5 * y_true[:, 3]  # y2
+
+        iou_matrix = box_iou(box1_vertices, anchor)
+
+        return iou_matrix
 
 
 class RetinaFocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2):
+    def __init__(self, alpha=0.25, gamma=2.0):
         """
         Inicjalizacja funkcji straty Focal Loss.
 
@@ -40,7 +41,7 @@ class RetinaFocalLoss(nn.Module):
         - alpha: Parametr wpływający na wagę klas pozytywnych i negatywnych.
         - gamma: Parametr regulujący skupienie na trudnych do sklasyfikowania przykładach.
         """
-        super(RetinaFocalLoss, self).__init__()
+        super().__init__()
         self.alpha = alpha
         self.gamma = gamma
 
@@ -56,17 +57,13 @@ class RetinaFocalLoss(nn.Module):
         Zwraca:
         - Tensor zawierający wartości Focal Loss dla każdego przykładu.
         """
-        # Obliczenia cross entropy z funkcją sigmoid
-        cross_entropy = F.binary_cross_entropy_with_logits(y_pred, y_true, reduction='none')
-
-        # Obliczenia prawdopodobieństw przy użyciu funkcji sigmoid
-        probs = torch.sigmoid(y_pred)
+        cross_entropy = F.cross_entropy(y_pred, y_true, reduction='none')
 
         # Określenie wag dla klas pozytywnych i negatywnych
         alpha = torch.where(y_true == 1, self.alpha, 1 - self.alpha)
 
         # Obliczenie pt - czynnika skupiającego uwagę na trudnych przykładach
-        pt = torch.where(y_true == 1, probs, 1 - probs)
+        pt = torch.where(y_true == 1, y_pred, 1 - y_pred)
 
         # Obliczenia straty za pomocą Focal Loss
         loss = alpha * (1 - pt)**self.gamma * cross_entropy
@@ -76,7 +73,7 @@ class RetinaFocalLoss(nn.Module):
 
 
 class RetinaNetLoss(nn.Module):
-    def __init__(self, num_classes=1, alpha=0.25, gamma=2.0, delta=1.0):
+    def __init__(self, alpha=0.25, gamma=2.0, num_classes=1):
         """
         Inicjalizacja klasy RetinaNetLoss.
 
@@ -84,14 +81,15 @@ class RetinaNetLoss(nn.Module):
             num_classes (int): Liczba klas w zadaniu detekcji obiektów.
             alpha (float): Parametr kontrolujący wagę klas pozytywnych i negatywnych w klasyfikacji.
             gamma (float): Parametr gamma używany w funkcji Focal Loss.
-            delta (float): Parametr delta używany w funkcji RetinaNetBoxLoss.
         """
         super(RetinaNetLoss, self).__init__()
-        self.clf_loss = RetinaFocalLoss(alpha=alpha, gamma=gamma)
-        self.box_loss = RetinaNetBoxLoss(delta)
+        self.FocalLoss = RetinaFocalLoss(alpha=alpha, gamma=gamma)
+        self.IoU = RetinaNetBoxIoU()
         self.num_classes = num_classes
+        self.alpha = alpha
+        self.gamma = gamma
 
-    def forward(self, y_true, y_pred):
+    def forward(self, y_true, y_classifs, y_regressions, anchors):
         """
         Metoda obliczająca łączną stratę dla modelu RetinaNet.
 
@@ -102,51 +100,86 @@ class RetinaNetLoss(nn.Module):
         Returns:
             torch.Tensor: Obliczona łączna strata dla modelu RetinaNet.
         """
-        y_pred = y_pred.float()
-        box_labels = y_true[:, :, :4]
-        box_predictions = y_pred[:, :, :4]
-        temp = y_true.clone()
-        temp[:, :, 4] = torch.where(temp[:, :, 4] == -1, torch.tensor(0), temp[:, :, 4])
-        cls_labels = F.one_hot(
-            temp[:, :, 4].long(),
-            num_classes=self.num_classes + 1,
-        ).float()
-        cls_predictions = y_pred[:, :, 4:]
+        batch_size = y_classifs.shape[0]
 
-        # Stworzenie masek dla pozytywnych przykładów i ignorowania
-        positive_mask = (y_true[:, :, 4] > -1.0).float()
-        ignore_mask = (y_true[:, :, 4] == -2.0).float()
+        for i in range(batch_size):
+            box = y_true[j, :, :4]
+            label = y_true[j, :, 4]
 
-        # Obliczenie straty klasyfikacji i regresji bounding boxów
-        clf_loss = self.clf_loss(cls_labels, cls_predictions)
-        box_loss = self.box_loss(box_labels, box_predictions)
+            # classif = y_classifs[j, :, :]
+            # regression = y_regressions[j, :, :]
 
-        # Zerowanie strat tam, gdzie maski są równe 1.0
-        clf_loss = torch.where(ignore_mask.eq(1.0), torch.tensor(0.0), clf_loss)
-        box_loss = torch.where(positive_mask.eq(1.0), box_loss, torch.tensor(0.0))
+            cls_labels = F.one_hot(
+                label.long(),
+                num_classes=self.num_classes,
+            ).float()
 
-        # Obliczenie średnich strat, normalizowanych przez sumę pozytywnych przykładów
-        normalizer = positive_mask.sum(dim=-1)
-        clf_loss = torch.div(clf_loss.sum(dim=-1), normalizer)
-        box_loss = torch.div(box_loss.sum(dim=-1), normalizer)
+            # Obliczenie straty klasyfikacji i iou bounding boxów
+            clf_loss = self.FocalLoss(cls_labels, y_classifs) # TODO to na pewno musi byc inaczej
+            iou_matrix = self.IoU(box, anchors)
 
-        # Ostateczna strata to suma straty klasyfikacji i regresji bounding boxów
-        loss = clf_loss + box_loss
+            IoU_max, IoU_argmax = torch.max(iou_matrix, dim=1)  # num_anchors x 1
+
+            targets = torch.ones(y_classifs.shape) * -1
+            targets[torch.lt(IoU_max, 0.4), :] = 0
+            positive_idx = torch.ge(IoU_max, 0.5)
+
+            num_positive_anchors = positive_idx.sum()
+            assigned_annotations = box[IoU_argmax, :]
+
+            targets[positive_idx, :] = 0
+            targets[positive_idx, assigned_annotations[positive_idx, 4].long()] = 1
+
+            #################
+            if torch.cuda.is_available():
+                alpha_factor = torch.ones(targets.shape).cuda() * self.alpha
+            else:
+                alpha_factor = torch.ones(targets.shape) * self.alpha
+
+            alpha_factor = torch.where(torch.eq(targets, 1.), alpha_factor, 1. - alpha_factor)
+            focal_weight = torch.where(torch.eq(targets, 1.), 1. - y_classifs, y_classifs)
+            focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
+
+            bce = -(targets * torch.log(y_classifs) + (1.0 - targets) * torch.log(1.0 - y_classifs))
+
+            # cls_loss = focal_weight * torch.pow(bce, gamma)
+            cls_loss = focal_weight * bce
+
+            if torch.cuda.is_available():
+                cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape).cuda())
+            else:
+                cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape))
+
+            classification_losses.append(cls_loss.sum() / torch.clamp(num_positive_anchors.float(), min=1.0))
+
+            loss = clf_loss + box_loss
         return loss
 
 
-def test_box_loss():
-    y_true = torch.tensor([[1, 2, 4, 5], [3, 1, 6, 4]], dtype=torch.float32)
-    y_pred = torch.tensor([[0, 1, 3, 4], [2, 2, 4, 5]], dtype=torch.float32)
-    delta = 1.0
-    retina_loss = RetinaNetBoxLoss(delta)
-    loss = retina_loss(y_true, y_pred)
+def test_box_iou():
+    import pytest
+    y_true = torch.tensor([0.5, 0.5, 1.0, 1.0])
+    anchor = torch.tensor([0.0, 0.0, 1.0, 1.0])
+
+    retinanet_box_iou = RetinaNetBoxIoU()
+
+    iou_matrix = retinanet_box_iou(y_true, anchor)
+
+    assert isinstance(iou_matrix, torch.Tensor)
+
+    assert iou_matrix.shape == (2, 2)
+
+    assert iou_matrix[0, 0].item() == pytest.approx(1.0)
+    assert iou_matrix[0, 1].item() == pytest.approx(0.25)
+    assert iou_matrix[1, 0].item() == pytest.approx(0.25)
+    assert iou_matrix[1, 1].item() == pytest.approx(1.0)
+
     print("\nGround Truth:")
     print(y_true)
-    print("\nPredictions:")
-    print(y_pred)
-    print("\nLoss:")
-    print(loss)
+    print("\nAnchor:")
+    print(anchor)
+    print("\nIoU:")
+    print(iou_matrix)
 
 
 def test_focal_loss():
@@ -178,6 +211,6 @@ def test_retina_loss():
 
 
 if __name__ == "__main__":
-    test_box_loss()
+    test_box_iou()
     test_focal_loss()
     test_retina_loss()
