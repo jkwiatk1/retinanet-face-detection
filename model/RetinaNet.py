@@ -5,7 +5,7 @@ from model.FeaturesPyramid import FeaturesPyramid
 from model.ResNet50 import ResNet50
 from model.Head import ClassificationModel, RegressionModel
 from model.Anchors import Anchors
-from model.Loss import RetinaFocalLoss
+from model.Loss import RetinaNetLoss
 
 
 class RetinaNet(nn.Module):
@@ -30,7 +30,7 @@ class RetinaNet(nn.Module):
 
         self.anchors = Anchors()
 
-        self.FocalLoss = RetinaFocalLoss()
+        self.FocalLoss = RetinaNetLoss()
 
     def forward(self, x):
         '''
@@ -52,8 +52,11 @@ class RetinaNet(nn.Module):
 
         anchors = self.anchors(img)
 
-        self.FocalLoss(annotations, classification)
-
+        if self.training:
+            self.FocalLoss(annotations, classification, regression, anchors)
+        else:
+            pass
+            ## TODO code for test
 
         return regression, classification
 
