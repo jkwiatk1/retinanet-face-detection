@@ -11,9 +11,10 @@ from model.RetinaNet import RetinaNet
 
 DATA_DIR = 'WIDER'
 NUM_CLASSES = 1
-BATCH_SIZE = 4
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 EPOCHS_NUM = 10
+WEIGHTS = 'data/model'
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
@@ -54,12 +55,9 @@ for epoch_num in range(EPOCHS_NUM):
         optimizer.zero_grad()
 
         if torch.cuda.is_available():
-            regression_loss, classification_loss = model([data['img'].cuda().float(), data['boxes_list']])
+            classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
         else:
-            regression_loss, classification_loss = model([data['img'].float(), data['boxes_list']])
-
-        classification_loss = classification_loss.mean()
-        regression_loss = regression_loss.mean()
+            classification_loss, regression_loss = model([data['img'].float(), data['boxes_list']])
 
         loss = classification_loss + regression_loss
 
@@ -77,8 +75,12 @@ for epoch_num in range(EPOCHS_NUM):
         epoch_loss.append(float(loss))
 
         print(
-            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | Running loss: {:1.5f}'.format(
-                epoch_num, iter_num, float(classification_loss), float(regression_loss), np.mean(loss_hist)))
+            'Epoch: {}/{} | Iteration: {}/{} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                epoch_num, EPOCHS_NUM, iter_num, len(train_data), float(classification_loss), float(regression_loss), np.mean(loss_hist)))
 
         del classification_loss
         del regression_loss
+
+    filename = f'model_{epoch_num}.pth'
+    torch.save(model, WEIGHTS + filename)
+

@@ -72,7 +72,7 @@ def generate_anchor_boxes(base_size=256, ratios=None, scales=None):
         for scale in scales:
             width = base_size * scale * np.sqrt(ratio)
             height = base_size * scale / np.sqrt(ratio)
-            anchor_box = [-width / 2, -height / 2, width / 2, height / 2]
+            anchor_box = [-height / 2, -width / 2, height / 2, width / 2]
             anchor_boxes.append(anchor_box)
     return np.array(anchor_boxes)
 
@@ -101,8 +101,8 @@ def shift(shape, stride, anchors):
     Returns:
     - numpy array: Tablica NumPy reprezentująca wszystkie przesunięte kotwice na siatkę punktów.
     """
-    shift_x = (np.arange(0, shape[1])) * stride
-    shift_y = (np.arange(0, shape[0])) * stride
+    shift_x = (np.arange(0, shape[1]) + 0.5) * stride
+    shift_y = (np.arange(0, shape[0]) + 0.5) * stride
     x, y = np.meshgrid(shift_x, shift_y)
     x = x.ravel()
     y = y.ravel()
@@ -154,5 +154,11 @@ def tests():
     boxes = anchors(input_tensor)
     print(boxes.shape)
 
+def tests_Anchor():
+    anchors = Anchors()
+    input_tensor = torch.randn((1, 3, 64, 64))  # Przykładowy tensor wejściowy
+    boxes = anchors(input_tensor)
+    print(boxes.shape)
+
 if __name__ == "__main__":
-    tests()
+    tests_Anchor()

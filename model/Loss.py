@@ -22,6 +22,9 @@ class RetinaNetBoxIoU(nn.Module):
         """
 
         box1_vertices = torch.zeros_like(y_true)
+        if torch.cuda.is_available():
+            box1_vertices = box1_vertices.cuda()
+
         box1_vertices[:, 0] = y_true[:, 0] - 0.5 * y_true[:, 2]  # x1
         box1_vertices[:, 1] = y_true[:, 1] - 0.5 * y_true[:, 3]  # y1
         box1_vertices[:, 2] = y_true[:, 0] + 0.5 * y_true[:, 2]  # x2
@@ -46,30 +49,7 @@ class RetinaFocalLoss(nn.Module):
         self.gamma = gamma
 
     def forward(self, y_true, y_pred):
-        """
-        todo: czy model klasyfikacji daje na wyjściu logity czy prawdopodobieństwa po funkcji aktywacji
-        Metoda forward obliczająca Focal Loss.
-
-        Parametry:
-        - y_true: Tensor z prawdziwymi etykietami binarnymi (0 lub 1).
-        - y_pred: Tensor z przewidywanymi wartościami logits (bez funkcji aktywacji).
-
-        Zwraca:
-        - Tensor zawierający wartości Focal Loss dla każdego przykładu.
-        """
-        cross_entropy = F.cross_entropy(y_pred, y_true, reduction='none')
-
-        # Określenie wag dla klas pozytywnych i negatywnych
-        alpha = torch.where(y_true == 1, self.alpha, 1 - self.alpha)
-
-        # Obliczenie pt - czynnika skupiającego uwagę na trudnych przykładach
-        pt = torch.where(y_true == 1, y_pred, 1 - y_pred)
-
-        # Obliczenia straty za pomocą Focal Loss
-        loss = alpha * (1 - pt)**self.gamma * cross_entropy
-
-        # Sumowanie strat wzdłuż ostatniej osi tensora
-        return torch.sum(loss, dim=-1)
+        pass
 
 
 class RetinaNetLoss(nn.Module):
@@ -89,7 +69,7 @@ class RetinaNetLoss(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
 
-    def forward(self, y_true, y_classifs, y_regressions, anchors):
+    def forward(self, y_true_tmp, y_classifs, y_regressions, anchors):
         """
         Metoda obliczająca łączną stratę dla modelu RetinaNet.
 
@@ -100,61 +80,106 @@ class RetinaNetLoss(nn.Module):
         Returns:
             torch.Tensor: Obliczona łączna strata dla modelu RetinaNet.
         """
+        classification_losses = []
+        regression_losses = []
         batch_size = y_classifs.shape[0]
 
+        anchor = anchors[0, :, :]
+        anchor_widths = anchor[:, 2] - anchor[:, 0]
+        anchor_heights = anchor[:, 3] - anchor[:, 1]
+        anchor_ctr_x = anchor[:, 0] + 0.5 * anchor_widths
+        anchor_ctr_y = anchor[:, 1] + 0.5 * anchor_heights
+
+        # Class loss
         for i in range(batch_size):
-            box = y_true[i, :, :4]
-            label = y_true[i, :, 4]
+            box_annotation = y_true_tmp[i,:,:]
+            y_true = box_annotation[box_annotation[:, 4] != -1]
+            true_boxes = y_true[:, :4]
 
-            # classif = y_classifs[j, :, :]
-            # regression = y_regressions[j, :, :]
-
-            cls_labels = F.one_hot(
-                label.long(),
-                num_classes=self.num_classes,
-            ).float()
+            predict_labels = y_classifs[i, :, :]
+            predict_boxes = y_regressions[i, :, :]
 
             # Obliczenie straty klasyfikacji i iou bounding boxów
-            clf_loss = self.FocalLoss(cls_labels, y_classifs) # TODO to na pewno musi byc inaczej bo cls.size to 1,1 a y_classifs to batch (4,153576,1)
-            iou_matrix = self.IoU(box, anchors) #TODO box.shape:(1,4) anchors.shape:(1,153576,4)
-
+            iou_matrix = self.IoU(true_boxes, anchor).t()  # true_boxes.shape:(1,4) anchors.shape:(153576,4)
             IoU_max, IoU_argmax = torch.max(iou_matrix, dim=1)  # num_anchors x 1
 
-            targets = torch.ones(y_classifs.shape) * -1
+            if torch.cuda.is_available():
+                targets = torch.ones(predict_labels.shape, device='cuda') * -1
+            else:
+                targets = torch.ones(predict_labels.shape) * -1
+
             targets[torch.lt(IoU_max, 0.4), :] = 0
             positive_idx = torch.ge(IoU_max, 0.5)
-
             num_positive_anchors = positive_idx.sum()
-            assigned_annotations = box[IoU_argmax, :]
-
+            assigned_annotations = y_true[IoU_argmax, :]
             targets[positive_idx, :] = 0
             targets[positive_idx, assigned_annotations[positive_idx, 4].long()] = 1
 
-            #################
             if torch.cuda.is_available():
-                alpha_factor = torch.ones(targets.shape).cuda() * self.alpha
+                alpha_factor = torch.ones(targets.shape, device='cuda') * self.alpha
             else:
                 alpha_factor = torch.ones(targets.shape) * self.alpha
 
             alpha_factor = torch.where(torch.eq(targets, 1.), alpha_factor, 1. - alpha_factor)
-            focal_weight = torch.where(torch.eq(targets, 1.), 1. - y_classifs, y_classifs)
+            focal_weight = torch.where(torch.eq(targets, 1.), 1. - predict_labels, predict_labels)
             focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
 
-            bce = -(targets * torch.log(y_classifs) + (1.0 - targets) * torch.log(1.0 - y_classifs))
+            bce = -(targets * torch.log(predict_labels) + (1.0 - targets) * torch.log(1.0 - predict_labels))
 
             # cls_loss = focal_weight * torch.pow(bce, gamma)
             cls_loss = focal_weight * bce
 
             if torch.cuda.is_available():
-                cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape).cuda())
+                cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape, device='cuda'))
             else:
                 cls_loss = torch.where(torch.ne(targets, -1.0), cls_loss, torch.zeros(cls_loss.shape))
 
             classification_losses.append(cls_loss.sum() / torch.clamp(num_positive_anchors.float(), min=1.0))
 
-            loss = clf_loss + box_loss
-            loss = 0
-        return loss
+
+            # Regression loss
+            if positive_idx.sum() > 0:
+                assigned_annotations = assigned_annotations[positive_idx, :]
+
+                anchor_widths_pi = anchor_widths[positive_idx]
+                anchor_heights_pi = anchor_heights[positive_idx]
+                anchor_ctr_x_pi = anchor_ctr_x[positive_idx]
+                anchor_ctr_y_pi = anchor_ctr_y[positive_idx]
+
+                gt_ctr_x = assigned_annotations[:, 0]
+                gt_ctr_y = assigned_annotations[:, 1]
+                gt_widths = torch.clamp(assigned_annotations[:, 2], min=1)
+                gt_heights = torch.clamp(assigned_annotations[:, 3], min=1)
+
+                targets_dx = (gt_ctr_x - anchor_ctr_x_pi) / anchor_widths_pi
+                targets_dy = (gt_ctr_y - anchor_ctr_y_pi) / anchor_heights_pi
+                targets_dw = torch.log(gt_widths / anchor_widths_pi)
+                targets_dh = torch.log(gt_heights / anchor_heights_pi)
+
+                targets = torch.stack((targets_dx, targets_dy, targets_dw, targets_dh))
+                targets = targets.t()
+
+                if torch.cuda.is_available():
+                    targets = targets / torch.Tensor([[0.1, 0.1, 0.2, 0.2]]).cuda()
+                else:
+                    targets = targets / torch.Tensor([[0.1, 0.1, 0.2, 0.2]])
+
+                y_regression_diff = torch.abs(targets - predict_boxes[positive_idx, :])
+                regression_loss = torch.where(
+                    torch.le(y_regression_diff, 1.0 / 9.0),
+                    0.5 * 9.0 * torch.pow(y_regression_diff, 2),
+                    y_regression_diff - 0.5 / 9.0
+                )
+
+                regression_losses.append(regression_loss.mean())
+
+            else:
+                if torch.cuda.is_available():
+                    regression_losses.append(torch.tensor(0).float().cuda())
+                else:
+                    regression_losses.append(torch.tensor(0).float())
+
+        return torch.stack(classification_losses).mean(dim=0, keepdim=True), torch.stack(regression_losses).mean(dim=0, keepdim=True)
 
 
 def test_box_iou():

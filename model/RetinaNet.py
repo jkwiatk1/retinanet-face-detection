@@ -53,12 +53,10 @@ class RetinaNet(nn.Module):
         anchors = self.anchors(img)
 
         if self.training:
-            self.FocalLoss(annotations, classification, regression, anchors)
+            return self.FocalLoss(annotations, classification, regression, anchors)
         else:
             pass
             ## TODO code for test
-
-        return regression, classification
 
 
 def test_output_from_fpn():
