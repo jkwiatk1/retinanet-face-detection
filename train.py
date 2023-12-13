@@ -7,7 +7,7 @@ import torch.optim as optim
 
 from WiderDataLoader.wider_loader import WiderFaceDataset
 from WiderDataLoader.wider_batch_iterator import BatchIterator
-from model.RetinaNet import RetinaNet
+from model.RetinaNet import RetinaNet, evaluate
 
 DATA_DIR = 'WIDER'
 NUM_CLASSES = 1
@@ -23,7 +23,7 @@ transform = Compose(
     [ToPILImage(), Resize((800, 1024)), ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 wider_train_dataset = WiderFaceDataset(DATA_DIR, split='train', transform=transform)
-# wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform)
+wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform)
 # wider_test_dataset = WiderFaceDataset(DATA_DIR, split='test', transform=transform)
 
 train_data = BatchIterator(wider_train_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -80,6 +80,7 @@ for epoch_num in range(EPOCHS_NUM):
 
         del classification_loss
         del regression_loss
+    evaluate(dataset=wider_val_dataset, model=model, threshold=0.05)
 
     filename = f'model_{epoch_num}.pth'
     torch.save(model, WEIGHTS + filename)
