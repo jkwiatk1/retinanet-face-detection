@@ -28,7 +28,6 @@ class BatchIterator:
             raise StopIteration
         indices = self.indices[self.current_index:self.current_index + self.batch_size]
         data = [self.dataset[i] for i in indices]
-        print(indices)
         images =[]
         boxes_num = []
         boxes = []
