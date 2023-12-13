@@ -1,6 +1,7 @@
 import random
 from torch.nn.utils.rnn import pad_sequence
 import torch
+from WiderDataLoader.wider_loader import WiderFaceDataset
 
 
 class BatchIterator:
@@ -9,23 +10,25 @@ class BatchIterator:
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.current_index = 0
-        self._reset()
-
-    def _reset(self):
+        self.indices = list(range(len(dataset)))
         if self.shuffle:
-            random.shuffle(self.dataset)
-        self.current_index = 0
+            random.shuffle(self.indices)
+
 
     def __iter__(self):
-        self._reset()
+        self.current_index = 0
+        if self.shuffle:
+            random.shuffle(self.indices)
         return self
+
 
     def __next__(self):
         if self.current_index >= len(self.dataset):
             # Wszystkie dane zostały już przetworzone
             raise StopIteration
-        indices = list(range(self.current_index, min(self.current_index + self.batch_size, len(self.dataset))))
+        indices = self.indices[self.current_index:self.current_index + self.batch_size]
         data = [self.dataset[i] for i in indices]
+        print(indices)
         images =[]
         boxes_num = []
         boxes = []
