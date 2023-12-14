@@ -39,13 +39,7 @@ def regression2BoxTransform(anchors, regression, std=None):
     pred_w = torch.exp(dw) * widths
     pred_h = torch.exp(dh) * heights
 
-    # Przeliczenie na x1,y1,x2,y2
-    pred_x1 = pred_ctr_x - 0.5 * pred_w
-    pred_y1 = pred_ctr_y - 0.5 * pred_h
-    pred_x2 = pred_ctr_x + 0.5 * pred_w
-    pred_y2 = pred_ctr_y + 0.5 * pred_h
-
-    pred_boxes = torch.stack([pred_x1, pred_y1, pred_x2, pred_y2], dim=2)
+    pred_boxes = torch.stack([pred_ctr_x, pred_ctr_y, pred_w, pred_h], dim=2)
     return pred_boxes
 
 

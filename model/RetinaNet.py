@@ -46,6 +46,8 @@ class RetinaNet(nn.Module):
         else:
             img = x
 
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         c3, c4, c5 = self.Backbone(img)
         fpn_features_map = self.FPN([c3, c4, c5])
 
@@ -87,35 +89,9 @@ class RetinaNet(nn.Module):
                 anchors_nms_idx = nms(anchorBoxes, scores, 0.5)
 
                 finalScores = torch.cat((finalScores, scores[anchors_nms_idx]))
-                finalAnchorBoxesLabels = torch.cat((finalAnchorBoxesLabels, torch.tensor([i] * anchors_nms_idx.shape[0])))
+                finalAnchorBoxesLabels = torch.cat((finalAnchorBoxesLabels, torch.tensor([i] * anchors_nms_idx.shape[0], device=device)))
                 finalAnchorBoxesCoordinates = torch.cat((finalAnchorBoxesCoordinates, anchorBoxes[anchors_nms_idx]))
             return [finalScores, finalAnchorBoxesLabels, finalAnchorBoxesCoordinates]
-
-
-def test_output_from_fpn():
-    import torch
-    RetNet = RetinaNet()
-    input_tensor = torch.randn(1, 3, 512, 800)
-    print(input_tensor.size())
-    outputs_RN = RetNet(input_tensor)
-
-    for i, output in enumerate(outputs_RN):
-        print(f'Output P{i + 3} shape: {output.shape}')
-
-
-def test_output_from_head():
-    import torch
-    RetNet = RetinaNet()
-    input_tensor = torch.randn(1, 3, 512, 800)
-    print("Input tensor size:")
-    print(input_tensor.size())
-    output_regression_RN, output_class_RN = RetNet(input_tensor)
-
-    print("Output size of the classification head:", output_class_RN.shape)
-    print("Output size of the regression head:", output_regression_RN.shape)
-
-    print("Bias klasyfikacji:", RetNet.ClassificationModel.head[-1].bias.data)
-    print("Bias regresji:", RetNet.RegressionModel.head[-1].bias.data)
 
 
 def evaluate(dataset, model, threshold=0.05):
@@ -130,7 +106,7 @@ def evaluate(dataset, model, threshold=0.05):
 
             # run network
             if torch.cuda.is_available():
-                scores, labels, boxes = model(data['img'].permute(2, 0, 1).cuda().float().unsqueeze(dim=0))
+                scores, labels, boxes = model([data['img'].cuda().float().unsqueeze(0), data['boxes_list'].cuda().unsqueeze(0)])
             else:
                 scores, labels, boxes = model([data['img'].float().unsqueeze(0), data['boxes_list'].unsqueeze(0)])
             scores = scores.cpu()
@@ -138,10 +114,6 @@ def evaluate(dataset, model, threshold=0.05):
             boxes = boxes.cpu()
 
             if boxes.shape[0] > 0:
-                # change to (x, y, w, h)
-                boxes[:, 2] -= boxes[:, 0]
-                boxes[:, 3] -= boxes[:, 1]
-
                 # compute predicted labels and scores
                 # for box, score, label in zip(boxes[0], scores[0], labels[0]):
                 for box_id in range(boxes.shape[0]):
@@ -209,6 +181,31 @@ from WiderDataLoader.wider_loader import WiderFaceDataset
 from WiderDataLoader.wider_batch_iterator import BatchIterator
 import torch
 from torchvision.transforms import Compose, ToTensor, Normalize, ToPILImage, Resize
+
+def test_output_from_fpn():
+    import torch
+    RetNet = RetinaNet()
+    input_tensor = torch.randn(1, 3, 512, 800)
+    print(input_tensor.size())
+    outputs_RN = RetNet(input_tensor)
+
+    for i, output in enumerate(outputs_RN):
+        print(f'Output P{i + 3} shape: {output.shape}')
+
+
+def test_output_from_head():
+    import torch
+    RetNet = RetinaNet()
+    input_tensor = torch.randn(1, 3, 512, 800)
+    print("Input tensor size:")
+    print(input_tensor.size())
+    output_regression_RN, output_class_RN = RetNet(input_tensor)
+
+    print("Output size of the classification head:", output_class_RN.shape)
+    print("Output size of the regression head:", output_regression_RN.shape)
+
+    print("Bias klasyfikacji:", RetNet.ClassificationModel.head[-1].bias.data)
+    print("Bias regresji:", RetNet.RegressionModel.head[-1].bias.data)
 
 def test_eval():
     DATA_DIR = '../WIDER'
