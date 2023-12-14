@@ -80,9 +80,9 @@ for epoch_num in range(EPOCHS_NUM):
     torch.save(model, WEIGHTS + filename)
     model.eval()
     try:
-        evaluate(dataset=wider_train_dataset, model=model, threshold=0.05)
+        evaluate(dataset=wider_val_dataset, model=model, threshold=0.05)
     except Exception as e:
-        print(f"Błąd: {e}")
+        print(f"Error: {e}")
 
 
 
