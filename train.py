@@ -39,7 +39,7 @@ model = RetinaNet().to(device)
 #     print(size)
 #     break
 
-print(model)
+#print(model)
 
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 model.train()
@@ -53,7 +53,6 @@ for epoch_num in range(EPOCHS_NUM):
 
     for iter_num, data in enumerate(train_data):
         optimizer.zero_grad()
-
         if torch.cuda.is_available():
             classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
         else:
@@ -80,8 +79,9 @@ for epoch_num in range(EPOCHS_NUM):
 
         del classification_loss
         del regression_loss
-    evaluate(dataset=wider_val_dataset, model=model, threshold=0.05)
-
     filename = f'model_{epoch_num}.pth'
     torch.save(model, WEIGHTS + filename)
+    model.eval()
+    evaluate(dataset=wider_val_dataset, model=model, threshold=0.05)
+
 

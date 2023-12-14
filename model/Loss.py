@@ -99,6 +99,26 @@ class RetinaNetLoss(nn.Module):
             predict_labels = y_classifs[i, :, :]
             predict_boxes = y_regressions[i, :, :]
 
+            if true_boxes.shape[0] == 0:
+                if torch.cuda.is_available():
+                    alpha_factor = torch.ones(predict_labels.shape, device='cuda') * self.alpha
+                else:
+                    alpha_factor = torch.ones(predict_labels.shape) * self.alpha
+                    alpha_factor = 1. - alpha_factor
+                    focal_weight = predict_labels
+                    focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
+                    bce = -(torch.log(1.0 - predict_labels))
+                    cls_loss = focal_weight * bce
+                    classification_losses.append(cls_loss.sum())
+
+                if torch.cuda.is_available():
+                    regression_losses.append(torch.tensor(0).float().cuda())
+                else:
+                    regression_losses.append(torch.tensor(0).float())
+                continue
+
+
+
             # Obliczenie straty klasyfikacji i iou bounding boxów
             iou_matrix = self.IoU(true_boxes, anchor).t()  # true_boxes.shape:(1,4) anchors.shape:(153576,4)
             IoU_max, IoU_argmax = torch.max(iou_matrix, dim=1)  # num_anchors x 1
