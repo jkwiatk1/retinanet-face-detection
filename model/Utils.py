@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+from matplotlib import pyplot as plt, patches
 
 
 def regression2BoxTransform(anchors, regression, std=None):
@@ -64,3 +65,27 @@ def trimBox2Image(boxes, img):
     boxes[:, :, 3] = torch.clamp(boxes[:, :, 3], max=height)
 
     return boxes
+
+def center2cordinate(center_size_boxes):
+    centers_x = center_size_boxes[:, 0]
+    centers_y = center_size_boxes[:, 1]
+    widths = center_size_boxes[:, 2]
+    heights = center_size_boxes[:, 3]
+
+    x1 = centers_x - 0.5 * widths
+    y1 = centers_y - 0.5 * heights
+    x2 = centers_x + 0.5 * widths
+    y2 = centers_y + 0.5 * heights
+
+    coordinates_boxes = torch.stack([x1, y1, x2, y2], dim=1)
+    return coordinates_boxes
+
+def show_image(image, boxes):
+    img = np.transpose(image, (1, 2, 0)).numpy()
+    plt.imshow(img)
+    for box in boxes:
+        x, y, w, h = box[0], box[1], box[2], box[3]
+        rect = patches.Rectangle((x, y), w, h, linewidth=2, edgecolor='g', facecolor='none')
+        plt.gca().add_patch(rect)
+    plt.axis('off')
+    plt.show()

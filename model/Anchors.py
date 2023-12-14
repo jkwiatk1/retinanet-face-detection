@@ -26,7 +26,7 @@ class Anchors(nn.Module):
         if strides is None:
             self.strides = [2 ** x for x in self.pyramid_levels]
         if sizes is None:
-            self.sizes = [2 ** (x + 2) for x in self.pyramid_levels]
+            self.sizes = [2 ** (x + 1) for x in self.pyramid_levels]
         if ratios is None:
             self.ratios = np.array([0.5, 1, 2])
         if scales is None:
@@ -77,18 +77,6 @@ def generate_anchor_boxes(base_size=256, ratios=None, scales=None):
     return np.array(anchor_boxes)
 
 
-def compute_shape(image_shape, pyramid_levels):
-    """Compute shapes based on pyramid levels.
-
-    :param image_shape:
-    :param pyramid_levels:
-    :return:
-    """
-    image_shape = np.array(image_shape[:2])
-    image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in pyramid_levels]
-    return image_shapes
-
-
 def shift(shape, stride, anchors):
     """
     Przesuwa kotwice na siatkę punktów o określonym kroku.
@@ -109,6 +97,19 @@ def shift(shape, stride, anchors):
     shifts = np.vstack((x, y, x, y)).transpose()
     all_anchors = anchors.reshape((1, -1, 4)) + shifts.reshape((-1, 1, 4))
     return all_anchors.reshape((-1, 4))
+
+
+
+def compute_shape(image_shape, pyramid_levels):
+    """Compute shapes based on pyramid levels.
+
+    :param image_shape:
+    :param pyramid_levels:
+    :return:
+    """
+    image_shape = np.array(image_shape[:2])
+    image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in pyramid_levels]
+    return image_shapes
 
 
 def anchors_for_shape(image_shape, pyramid_levels=None, ratios=None, scales=None,
@@ -154,11 +155,13 @@ def tests():
     boxes = anchors(input_tensor)
     print(boxes.shape)
 
+
 def tests_Anchor():
     anchors = Anchors()
     input_tensor = torch.randn((1, 3, 64, 64))  # Przykładowy tensor wejściowy
     boxes = anchors(input_tensor)
     print(boxes.shape)
+
 
 if __name__ == "__main__":
     tests_Anchor()

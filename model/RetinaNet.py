@@ -9,7 +9,7 @@ from model.ResNet50 import ResNet50
 from model.Head import ClassificationModel, RegressionModel
 from model.Anchors import Anchors
 from model.Loss import RetinaNetLoss
-from model.Utils import regression2BoxTransform, trimBox2Image
+from model.Utils import regression2BoxTransform, trimBox2Image, center2cordinate, show_image
 from torchvision.ops import nms
 
 class RetinaNet(nn.Module):
@@ -64,29 +64,27 @@ class RetinaNet(nn.Module):
             transformed_anchors = regression2BoxTransform(anchors, regression)
             transformed_anchors = trimBox2Image(transformed_anchors, img)
 
+            finalScores = torch.empty(0, device=device)
+            finalAnchorBoxesLabels = torch.empty(0, device=device).long()
             if torch.cuda.is_available():
-                finalScores = torch.empty(0, device='cuda')
-                finalAnchorBoxesLabels = torch.empty(0, device='cuda').long()
                 finalAnchorBoxesCoordinates = torch.Tensor([]).cuda()
             else:
-                finalScores = torch.Tensor([])
-                finalAnchorBoxesLabels = torch.Tensor([]).long()
                 finalAnchorBoxesCoordinates = torch.Tensor([])
-
-            ## TODO - usunac po testach dzialania walidacji
-            #classification[0, 5, 0] = 0.4
 
             for i in range(classification.shape[2]):
                 scores = torch.squeeze(classification[:, :, i])
-                scores_over_thresh = (scores > 0.05)
+                scores_over_thresh = (scores > 0.1)
                 if scores_over_thresh.sum() == 0:
                     continue    # no boxes to NMS, just continue
 
                 # NMS - Non maximum suppression - usuwanie obszarów, które mają mniejsze prawdopodobieństwo obecności
-                # obiektu lub są silnie przekrywające się z innymi obszarami o wyższym prawdopodobieństwi
+                # obiektu lub są silnie pokrywajace się z innymi obszarami o wyższym prawdopodobieństwie
                 scores = scores[scores_over_thresh]
                 anchorBoxes = torch.squeeze(transformed_anchors)[scores_over_thresh]
-                anchors_nms_idx = nms(anchorBoxes, scores, 0.5)
+
+                coordinates_anchorBoxes = center2cordinate(anchorBoxes)
+
+                anchors_nms_idx = nms(coordinates_anchorBoxes, scores, 0.5)
 
                 finalScores = torch.cat((finalScores, scores[anchors_nms_idx]))
                 finalAnchorBoxesLabels = torch.cat((finalAnchorBoxesLabels, torch.tensor([i] * anchors_nms_idx.shape[0], device=device)))
@@ -104,7 +102,6 @@ def evaluate(dataset, model, threshold=0.05):
         for index in range(len(dataset)):
             data = dataset[index]
 
-            # run network
             if torch.cuda.is_available():
                 scores, labels, boxes = model([data['img'].cuda().float().unsqueeze(0), data['boxes_list'].cuda().unsqueeze(0)])
             else:
@@ -115,7 +112,6 @@ def evaluate(dataset, model, threshold=0.05):
 
             if boxes.shape[0] > 0:
                 # compute predicted labels and scores
-                # for box, score, label in zip(boxes[0], scores[0], labels[0]):
                 for box_id in range(boxes.shape[0]):
                     score = float(scores[box_id])
                     label = int(labels[box_id])
@@ -134,6 +130,9 @@ def evaluate(dataset, model, threshold=0.05):
                         'iscrowd': 0,
                     }
                     results.append(image_result)
+
+                # show_image(data['img'], boxes)
+
 
             for i in range(data['boxes_num']):
                 image_result = {
@@ -175,6 +174,8 @@ def evaluate(dataset, model, threshold=0.05):
         coco_eval.accumulate()
         coco_eval.summarize()
         return
+
+
 
 
 from WiderDataLoader.wider_loader import WiderFaceDataset
