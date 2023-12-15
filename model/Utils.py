@@ -89,3 +89,21 @@ def show_image(image, boxes):
         plt.gca().add_patch(rect)
     plt.axis('off')
     plt.show()
+
+def draw_loss(loss, num_epochs, save_path, title: str = 'Loss Curve Over Epochs', label: str = 'Loss Curve'):
+    epochs = range(1, len(num_epochs) + 1)
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(epochs, loss, label=label)
+    plt.title(title)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.grid()
+    plt.legend()
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()
