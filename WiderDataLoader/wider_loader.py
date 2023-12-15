@@ -28,20 +28,37 @@ class WiderFaceDataset(Dataset):
         return len(self.image_paths)
 
     def __getitem__(self, idx):
-        img_path = self.image_paths[idx]
-        box_num = self.boxes_num[idx]
-        boxes = self.boxes[idx]
-        param = self.parameters[idx]
-        image = self.load_image(img_path)
-        begin_resolution = image.shape[:2]
-        if self.transform:
-            image = self.transform(image)
-        end_resolution = image.shape[:2]
-        if isinstance(image, torch.Tensor):
-            end_resolution = image.shape[-2:]
-        boxes_adjusted = self.adjust_boxes(boxes, begin_resolution, end_resolution)
-        sample = {'img': image, 'boxes_num': box_num, 'boxes_list': boxes_adjusted, 'parameters': param}
-        return sample
+        if isinstance(idx, slice):
+            # Handle slicing for a range of indices [start:stop]
+            start = idx.start if idx.start is not None else 0
+            stop = idx.stop if idx.stop is not None else len(self.image_paths)
+            step = idx.step if idx.step is not None else 1
+            selected_indices = range(start, stop, step)
+        else:
+            # Handle a single index
+            selected_indices = [idx]
+
+        samples = []
+        for selected_idx in selected_indices:
+            img_path = self.image_paths[selected_idx]
+            box_num = self.boxes_num[selected_idx]
+            boxes = self.boxes[selected_idx]
+            param = self.parameters[selected_idx]
+            image = self.load_image(img_path)
+            begin_resolution = image.shape[:2]
+            if self.transform:
+                image = self.transform(image)
+            end_resolution = image.shape[:2]
+            if isinstance(image, torch.Tensor):
+                end_resolution = image.shape[-2:]
+            boxes_adjusted = self.adjust_boxes(boxes, begin_resolution, end_resolution)
+            sample = {'img': image, 'boxes_num': box_num, 'boxes_list': boxes_adjusted, 'parameters': param}
+            samples.append(sample)
+
+        if len(samples) == 1:
+            return samples[0]
+        else:
+            return samples
 
     def _get_image_paths(self):
         image_paths = []
