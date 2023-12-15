@@ -32,10 +32,9 @@ train_data = BatchIterator(wider_train_dataset, batch_size=BATCH_SIZE, shuffle=F
 # test_data = BatchIterator(wider_test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 model = RetinaNet().to(device)
-
+# model = torch.load(PRETRAIN_WEIGHTS+'one_batch_train_lr_2e4_from_pretrain/model_120.pth', map_location=device)
 #print(model)
 
-# model = torch.load(PRETRAIN_WEIGHTS+'one_batch_train_lr_2e4_from_pretrain/model_120.pth', map_location=device)
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 model.train()
