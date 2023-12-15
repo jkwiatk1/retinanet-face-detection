@@ -136,7 +136,7 @@ wider_val_dataset = WiderFaceDataset(data_dir, 'val')
 print(wider_val_dataset[0])
 '''
 
-def histogram():
+def histogram_of_paramets():
     data_dir = '../WIDER'
     transform = Compose([ToPILImage(), Resize((900, 1024)), ToTensor()])
     wider_train_dataset = WiderFaceDataset(data_dir, split='train', transform=transform)
@@ -189,7 +189,7 @@ def histogram():
     plt.show()
 
 
-def histogram2():
+def histogram_of_resolution():
     he = []
     wi = []
     data_dir = '../WIDER'

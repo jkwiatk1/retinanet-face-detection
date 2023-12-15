@@ -13,11 +13,13 @@ from model.Utils import regression2BoxTransform, trimBox2Image, center2cordinate
 from torchvision.ops import nms
 
 class RetinaNet(nn.Module):
-    def __init__(self, num_classes=1, backbone='resnet50'):
+    def __init__(self, num_classes=1, backbone='resnet50', nms_threshold=0.5, score_threshold=0.1):
         super().__init__()
 
         self.fpn_feature_size = 256
         self.prior_probability = 0.01
+        self.nms_threshold = nms_threshold
+        self.score_threshold = score_threshold
 
         if backbone == 'resnet50':
             self.Backbone = ResNet50()
@@ -35,6 +37,7 @@ class RetinaNet(nn.Module):
         self.anchors = Anchors()
 
         self.FocalLoss = RetinaNetLoss()
+
 
     def forward(self, x):
         '''
@@ -73,7 +76,7 @@ class RetinaNet(nn.Module):
 
             for i in range(classification.shape[2]):
                 scores = torch.squeeze(classification[:, :, i])
-                scores_over_thresh = (scores > 0.1)
+                scores_over_thresh = (scores > self.score_threshold)
                 if scores_over_thresh.sum() == 0:
                     continue    # no boxes to NMS, just continue
 
@@ -84,12 +87,18 @@ class RetinaNet(nn.Module):
 
                 coordinates_anchorBoxes = center2cordinate(anchorBoxes)
 
-                anchors_nms_idx = nms(coordinates_anchorBoxes, scores, 0.5)
+                anchors_nms_idx = nms(coordinates_anchorBoxes, scores, self.nms_threshold)
 
                 finalScores = torch.cat((finalScores, scores[anchors_nms_idx]))
                 finalAnchorBoxesLabels = torch.cat((finalAnchorBoxesLabels, torch.tensor([i] * anchors_nms_idx.shape[0], device=device)))
                 finalAnchorBoxesCoordinates = torch.cat((finalAnchorBoxesCoordinates, anchorBoxes[anchors_nms_idx]))
             return [finalScores, finalAnchorBoxesLabels, finalAnchorBoxesCoordinates]
+
+    def set_eval_thresholds(self, nms_threshold=None, score_threshold=None):
+        if nms_threshold is not None:
+            self.nms_threshold = nms_threshold
+        if score_threshold is not None:
+            self.score_threshold = score_threshold
 
 
 def evaluate(dataset, model, threshold=0.05):
