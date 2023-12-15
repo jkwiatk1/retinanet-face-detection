@@ -8,12 +8,13 @@ import torch.optim as optim
 from WiderDataLoader.wider_loader import WiderFaceDataset
 from WiderDataLoader.wider_batch_iterator import BatchIterator
 from model.RetinaNet import RetinaNet, evaluate
+from model.Utils import show_image
 
 DATA_DIR = 'WIDER'
 NUM_CLASSES = 1
-BATCH_SIZE = 32
-LEARNING_RATE = 2e-5
-EPOCHS_NUM = 10
+BATCH_SIZE = 16
+LEARNING_RATE = 2e-4
+EPOCHS_NUM = 100
 WEIGHTS = 'data/model/'
 PRETRAIN_WEIGHTS = 'data/model/'
 
@@ -21,7 +22,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 transform = Compose(
-    [ToPILImage(), Resize((512, 800)), ToTensor(),Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]) #
+    [ToPILImage(), Resize((512, 800)), ToTensor(),Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 wider_train_dataset = WiderFaceDataset(DATA_DIR, split='train', transform=transform)
 wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform)
@@ -48,6 +49,12 @@ for epoch_num in range(EPOCHS_NUM):
 
     for iter_num, data in enumerate(train_data):
         optimizer.zero_grad()
+
+        ### for one batch train
+        if iter_num >= 1:
+            break
+        ###
+
         if torch.cuda.is_available():
             classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
         else:
@@ -80,9 +87,6 @@ for epoch_num in range(EPOCHS_NUM):
     torch.save(model, WEIGHTS + filename)
     model.eval()
     try:
-        evaluate(dataset=wider_val_dataset, model=model, threshold=0.05)
+        evaluate(dataset=wider_train_dataset[0:BATCH_SIZE], model=model, threshold=0.05)
     except Exception as e:
         print(f"Error: {e}")
-
-
-
