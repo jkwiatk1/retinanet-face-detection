@@ -1,3 +1,4 @@
+import math
 import os
 import re
 
@@ -6,10 +7,14 @@ import skimage
 from PIL import Image
 import torch
 from matplotlib import pyplot as plt
+from sympy import transpose
 from torch.utils.data import Dataset
 from torchvision import datasets
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, ToTensor, Normalize, ToPILImage, Resize
+import torchvision.transforms as transforms
+from torchvision.ops import box_convert
+from model.Utils import show_image
 
 
 class WiderFaceDataset(Dataset):
@@ -52,6 +57,8 @@ class WiderFaceDataset(Dataset):
             if isinstance(image, torch.Tensor):
                 end_resolution = image.shape[-2:]
             boxes_adjusted = self.adjust_boxes(boxes, begin_resolution, end_resolution)
+            if self.split == 'train':
+                image, boxes_adjusted = self.augment_image_and_boxes(image, boxes_adjusted)
             sample = {'img': image, 'boxes_num': box_num, 'boxes_list': boxes_adjusted, 'parameters': param}
             samples.append(sample)
 
@@ -100,6 +107,72 @@ class WiderFaceDataset(Dataset):
             img = skimage.color.gray2rgb(img)
         return img
 
+    def transform_boxes(self, boxes, angle, scale, image_size):
+        """
+        MSkalowanie boxów i obracanie
+
+        Argumenty:
+        - box:  ramka w formacie: [x, y, width, height, class]
+        - angle: kąt w stopniach
+        - angle: parametr skalowania boxa
+        - image_size - rozmiar obrazu przed przekształceniem.
+        """
+        angle_rad = math.radians(angle)
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+
+        h, w = image_size
+        new_boxes = []
+        for box in boxes:
+            x_left, y_top, bw, bh, cl = box
+
+            # Wyznaczenie narożników
+            corners = [
+                [x_left, y_top],  # Lewy górny
+                [x_left + bw, y_top],  # Prawy górny
+                [x_left, y_top + bh],  # Lewy dolny
+                [x_left + bw, y_top + bh]  # Prawy dolny
+            ]
+
+            # Transformacja narożników
+            transformed_corners = []
+            for (x, y) in corners:
+                # Obrót wokół środka obrazu
+                new_x = cos_a * (x - w/2) - sin_a * (y - h/2) + w/2
+                new_y = sin_a * (x - w/2) + cos_a * (y - h/2) + h/2
+
+                # Skalowanie
+                new_x = (new_x - w/2) * scale + w/2
+                new_y = (new_y - h/2) * scale + h/2
+
+                transformed_corners.append([new_x, new_y])
+
+            # Obliczenie nowych współrzędnych boxa
+            x_coords, y_coords = zip(*transformed_corners)
+            new_x_left = min(x_coords)
+            new_y_top = min(y_coords)
+            new_bw = max(x_coords) - new_x_left
+            new_bh = max(y_coords) - new_y_top
+
+            new_boxes.append(torch.tensor([new_x_left, new_y_top, new_bw, new_bh, cl]))
+
+        return torch.stack(new_boxes)
+
+    def augment_image_and_boxes(self, image, boxes, angle_range=(-180, 180), scale_range=(-0.2, 0.2)):
+        angle = torch.FloatTensor(1).uniform_(*angle_range).item()
+        scale = torch.FloatTensor(1).uniform_(1 + scale_range[0], 1 + scale_range[1]).item()
+
+        transform = transforms.Compose([
+            transforms.RandomAffine([angle, angle], scale=(scale, scale))
+        ])
+        transformed_image = transform(image)
+
+        if boxes.shape[1] > 0 and boxes[0, 0] != -1:
+            transformed_boxes = self.transform_boxes(boxes, angle, scale, image_size=image.shape[-2:])
+        else:
+            transformed_boxes = boxes
+        return transformed_image, transformed_boxes
+
     def adjust_boxes(self, original_boxes, original_resolution, target_resolution):
         """
         Adjust bounding boxes coordinates and sizes based on the original and target resolutions.
@@ -130,11 +203,16 @@ class WiderFaceDataset(Dataset):
 # Przykład użycia
 '''
 data_dir = '../WIDER'
-wider_train_dataset = WiderFaceDataset(data_dir, 'train')
-print(wider_train_dataset[0])
-wider_val_dataset = WiderFaceDataset(data_dir, 'val')
-print(wider_val_dataset[0])
+transform = Compose([ToPILImage(), Resize((900, 1024)), ToTensor()])
+wider_train_dataset = WiderFaceDataset(data_dir, 'train', transform)
+data = wider_train_dataset[1]
+show_image(data['img'], data['boxes_list'])
+
+wider_val_dataset = WiderFaceDataset(data_dir, 'val', transform)
+data2 = wider_val_dataset[0]
+show_image(data2['img'], data2['boxes_list'])
 '''
+
 
 def histogram_of_paramets():
     data_dir = '../WIDER'
