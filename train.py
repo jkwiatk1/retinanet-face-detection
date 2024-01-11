@@ -15,6 +15,7 @@ NUM_CLASSES = 1
 BATCH_SIZE = 16
 LEARNING_RATE = 2e-4
 EPOCHS_NUM = 100
+SCHEDULER_GAMMA = 0.7
 WEIGHTS = 'data/model/'
 PRETRAIN_WEIGHTS = 'data/model/'
 
@@ -33,18 +34,21 @@ train_data = BatchIterator(wider_train_dataset, batch_size=BATCH_SIZE, shuffle=F
 
 model = RetinaNet().to(device)
 # model = torch.load(PRETRAIN_WEIGHTS+'one_batch_train_lr_2e4_from_pretrain/model_120.pth', map_location=device)
-#print(model)
 
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=EPOCHS_NUM/10, gamma=SCHEDULER_GAMMA)
 model.train()
 
 loss_hist = collections.deque(maxlen=500)
+regr_hist = collections.deque(maxlen=500)
+clas_hist = collections.deque(maxlen=500)
+best_valid_loss = float('Inf')
 
 for epoch_num in range(EPOCHS_NUM):
     model.train()
-
     epoch_loss = []
+    regr_loss = []
+    clas_loss = []
 
     for iter_num, data in enumerate(train_data):
         optimizer.zero_grad()
@@ -52,7 +56,6 @@ for epoch_num in range(EPOCHS_NUM):
         ### for one batch train
         if iter_num >= 1:
             break
-        ###
 
         if torch.cuda.is_available():
             classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
@@ -70,20 +73,18 @@ for epoch_num in range(EPOCHS_NUM):
 
         optimizer.step()
 
-        loss_hist.append(float(loss))
-
-        epoch_loss.append(float(loss))
-
-
-        print(
-            'Epoch: {}/{} | Iteration: {}/{} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | Running loss: {:1.5f}'.format(
-                epoch_num, EPOCHS_NUM, iter_num, len(train_data), float(classification_loss), float(regression_loss), np.mean(loss_hist)))
-
-        del classification_loss
-        del regression_loss
+    average_loss = np.mean(epoch_loss)
+    average_clas_loss = np.mean(clas_loss)
+    average_regr_loss = np.mean(regr_loss)
+    loss_hist.append(average_loss)
+    regr_hist.append(average_regr_loss)
+    clas_hist.append(average_clas_loss)
+    print(
+        f'Epoch: {epoch_num}/{EPOCHS_NUM} | Average Loss: {average_loss} | Classification loss: {float(average_clas_loss):1.5f} | Regression loss: {float(average_regr_loss):1.5f}')
+    scheduler.step()
 
     filename = f'model_{epoch_num}.pth'
-    torch.save(model, WEIGHTS + filename)
+    #torch.save(model, WEIGHTS + filename)
     model.eval()
     try:
         evaluate(dataset=wider_train_dataset[0:BATCH_SIZE], model=model, threshold=0.05)

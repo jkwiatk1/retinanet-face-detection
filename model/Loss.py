@@ -34,24 +34,7 @@ class RetinaNetBoxIoU(nn.Module):
 
         return iou_matrix
 
-
-class RetinaFocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2.0):
-        """
-        Inicjalizacja funkcji straty Focal Loss.
-
-        Parametry:
-        - alpha: Parametr wpływający na wagę klas pozytywnych i negatywnych.
-        - gamma: Parametr regulujący skupienie na trudnych do sklasyfikowania przykładach.
-        """
-        super().__init__()
-        self.alpha = alpha
-        self.gamma = gamma
-
-    def forward(self, y_true, y_pred):
-        pass
-
-
+'''This class is based on code from https://github.com/yhenon/pytorch-retinanet'''
 class RetinaNetLoss(nn.Module):
     def __init__(self, alpha=0.25, gamma=2.0, num_classes=1):
         """
@@ -63,7 +46,6 @@ class RetinaNetLoss(nn.Module):
             gamma (float): Parametr gamma używany w funkcji Focal Loss.
         """
         super(RetinaNetLoss, self).__init__()
-        self.FocalLoss = RetinaFocalLoss(alpha=alpha, gamma=gamma)
         self.IoU = RetinaNetBoxIoU()
         self.num_classes = num_classes
         self.alpha = alpha
@@ -228,14 +210,6 @@ def test_box_iou():
     print(iou_matrix)
 
 
-def test_focal_loss():
-    y_true = torch.tensor([1, 0, 1, 0], dtype=torch.float32)
-    y_pred = torch.tensor([0.2, -0.5, 1.2, 0.8], dtype=torch.float32)
-    focal = RetinaFocalLoss()
-    loss_value_single_class = focal(y_true, y_pred)
-    print("Focal Loss (Single Class):", loss_value_single_class.item())
-
-
 def test_retina_loss():
     num_classes = 1
     alpha = 0.25
@@ -258,5 +232,4 @@ def test_retina_loss():
 
 if __name__ == "__main__":
     test_box_iou()
-    test_focal_loss()
     test_retina_loss()

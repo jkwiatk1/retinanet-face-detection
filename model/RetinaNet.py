@@ -39,6 +39,7 @@ class RetinaNet(nn.Module):
         self.FocalLoss = RetinaNetLoss()
 
 
+    '''This forward function was partly based on code from https://github.com/yhenon/pytorch-retinanet'''
     def forward(self, x):
         '''
         :param x: input tensor

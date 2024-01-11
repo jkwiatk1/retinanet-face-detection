@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 
 
+'''This class is based on code from https://github.com/yhenon/pytorch-retinanet'''
 class Anchors(nn.Module):
     def __init__(self, pyramid_levels=None, strides=None, sizes=None, ratios=None, scales=None):
         """
@@ -26,7 +27,7 @@ class Anchors(nn.Module):
         if strides is None:
             self.strides = [2 ** x for x in self.pyramid_levels]
         if sizes is None:
-            self.sizes = [2 ** (x + 1) for x in self.pyramid_levels]
+            self.sizes = [1.8 ** (x + 1) for x in self.pyramid_levels]
         if ratios is None:
             self.ratios = np.array([0.5, 1, 2])
         if scales is None:
