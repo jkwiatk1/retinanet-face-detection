@@ -30,6 +30,7 @@ wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform)
 # wider_test_dataset = WiderFaceDataset(DATA_DIR, split='test', transform=transform)
 
 train_data = BatchIterator(wider_train_dataset, batch_size=BATCH_SIZE, shuffle=False)
+val_data = BatchIterator(wider_val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 # test_data = BatchIterator(wider_test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 model = RetinaNet().to(device)
@@ -37,42 +38,35 @@ model = RetinaNet().to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=EPOCHS_NUM/10, gamma=SCHEDULER_GAMMA)
-model.train()
+
 
 loss_hist = collections.deque(maxlen=500)
 regr_hist = collections.deque(maxlen=500)
 clas_hist = collections.deque(maxlen=500)
+loss_val_hist = collections.deque(maxlen=500)
+regr_val_hist = collections.deque(maxlen=500)
+clas_val_hist = collections.deque(maxlen=500)
 best_valid_loss = float('Inf')
 
 for epoch_num in range(EPOCHS_NUM):
-    model.train()
     epoch_loss = []
     regr_loss = []
     clas_loss = []
-
+    model.train()
     for iter_num, data in enumerate(train_data):
         optimizer.zero_grad()
-
-        ### for one batch train
         if iter_num >= 1:
             break
-
         if torch.cuda.is_available():
             classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
         else:
             classification_loss, regression_loss = model([data['img'].float(), data['boxes_list']])
-
         loss = classification_loss + regression_loss
-
         if bool(loss == 0):
             continue
-
         loss.backward()
-
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
-
         optimizer.step()
-
     average_loss = np.mean(epoch_loss)
     average_clas_loss = np.mean(clas_loss)
     average_regr_loss = np.mean(regr_loss)
@@ -82,6 +76,29 @@ for epoch_num in range(EPOCHS_NUM):
     print(
         f'Epoch: {epoch_num}/{EPOCHS_NUM} | Average Loss: {average_loss} | Classification loss: {float(average_clas_loss):1.5f} | Regression loss: {float(average_regr_loss):1.5f}')
     scheduler.step()
+
+    epoch_loss = []
+    regr_loss = []
+    clas_loss = []
+    model.eval()
+    for iter_num, data in enumerate(val_data):
+        if iter_num >= 1:
+            break
+        if torch.cuda.is_available():
+            classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
+        else:
+            classification_loss, regression_loss = model([data['img'].float(), data['boxes_list']])
+        loss = classification_loss + regression_loss
+        if bool(loss == 0):
+            continue
+    average_loss = np.mean(epoch_loss)
+    average_clas_loss = np.mean(clas_loss)
+    average_regr_loss = np.mean(regr_loss)
+    loss_val_hist.append(average_loss)
+    regr_val_hist.append(average_regr_loss)
+    clas_val_hist.append(average_clas_loss)
+    print(
+        f'Evaluate | Average Loss: {average_loss} | Classification loss: {float(average_clas_loss):1.5f} | Regression loss: {float(average_regr_loss):1.5f}')
 
     filename = f'model_{epoch_num}.pth'
     #torch.save(model, WEIGHTS + filename)

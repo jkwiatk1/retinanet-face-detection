@@ -201,6 +201,7 @@ class WiderFaceDataset(Dataset):
 
 
 # Przykład użycia
+
 '''
 data_dir = '../WIDER'
 transform = Compose([ToPILImage(), Resize((900, 1024)), ToTensor()])
