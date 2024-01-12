@@ -167,7 +167,7 @@ class WiderFaceDataset(Dataset):
         ])
         transformed_image = transform(image)
 
-        if boxes.shape[1] > 0 and boxes[0, 0] != -1:
+        if boxes.nbytes != 0:
             transformed_boxes = self.transform_boxes(boxes, angle, scale, image_size=image.shape[-2:])
         else:
             transformed_boxes = boxes
@@ -206,7 +206,7 @@ class WiderFaceDataset(Dataset):
 data_dir = '../WIDER'
 transform = Compose([ToPILImage(), Resize((900, 1024)), ToTensor()])
 wider_train_dataset = WiderFaceDataset(data_dir, 'train', transform)
-data = wider_train_dataset[1]
+data = wider_train_dataset[2000]
 show_image(data['img'], data['boxes_list'])
 
 wider_val_dataset = WiderFaceDataset(data_dir, 'val', transform)
