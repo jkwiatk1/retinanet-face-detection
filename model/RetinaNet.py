@@ -45,7 +45,7 @@ class RetinaNet(nn.Module):
         :param x: input tensor
         :return:
         '''
-        if self.training or self.eval():
+        if self.training or self.eval:
             img, annotations = x
         else:
             img = x
