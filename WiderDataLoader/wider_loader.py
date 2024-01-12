@@ -18,7 +18,7 @@ from model.Utils import show_image
 
 
 class WiderFaceDataset(Dataset):
-    def __init__(self, data_dir, split='train', transform=None, difficulty='low'):
+    def __init__(self, data_dir, split='train', transform=None, difficulty='low', augment=False):
         self.split = split
         self.data_dir = data_dir
         self.transform = transform
@@ -26,6 +26,7 @@ class WiderFaceDataset(Dataset):
         self.boxes = []
         self.boxes_num = []
         self.parameters = []
+        self.augment = augment
         datasets.WIDERFace(root=data_dir, split=split, transform=transform, download=True)
         self.image_paths = self._get_image_paths()
 
@@ -57,7 +58,7 @@ class WiderFaceDataset(Dataset):
             if isinstance(image, torch.Tensor):
                 end_resolution = image.shape[-2:]
             boxes_adjusted = self.adjust_boxes(boxes, begin_resolution, end_resolution)
-            if self.split == 'train':
+            if self.augment:
                 image, boxes_adjusted = self.augment_image_and_boxes(image, boxes_adjusted)
             sample = {'img': image, 'boxes_num': box_num, 'boxes_list': boxes_adjusted, 'parameters': param}
             samples.append(sample)

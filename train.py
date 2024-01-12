@@ -12,7 +12,7 @@ from model.Utils import show_image
 
 DATA_DIR = 'WIDER'
 NUM_CLASSES = 1
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 LEARNING_RATE = 2e-4
 EPOCHS_NUM = 100
 SCHEDULER_GAMMA = 0.7
@@ -23,10 +23,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(device)
 
 transform = Compose(
-    [ToPILImage(), Resize((512, 800)), ToTensor(),Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    [ToPILImage(), Resize((156, 156)), ToTensor(),Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
-wider_train_dataset = WiderFaceDataset(DATA_DIR, split='train', transform=transform)
-wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform)
+wider_train_dataset = WiderFaceDataset(DATA_DIR, split='train', transform=transform, augment=True)
+wider_val_dataset = WiderFaceDataset(DATA_DIR, split='val', transform=transform, augment=False)
 # wider_test_dataset = WiderFaceDataset(DATA_DIR, split='test', transform=transform)
 
 train_data = BatchIterator(wider_train_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -54,9 +54,9 @@ for epoch_num in range(EPOCHS_NUM):
     clas_loss = []
     model.train()
     for iter_num, data in enumerate(train_data):
-        optimizer.zero_grad()
         if iter_num >= 1:
             break
+        optimizer.zero_grad()
         if torch.cuda.is_available():
             classification_loss, regression_loss = model([data['img'].cuda().float(), data['boxes_list'].cuda()])
         else:
@@ -67,6 +67,8 @@ for epoch_num in range(EPOCHS_NUM):
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         optimizer.step()
+        print(
+            f'Krok: {iter_num}/{len(train_data)}')
     average_loss = np.mean(epoch_loss)
     average_clas_loss = np.mean(clas_loss)
     average_regr_loss = np.mean(regr_loss)
@@ -80,7 +82,6 @@ for epoch_num in range(EPOCHS_NUM):
     epoch_loss = []
     regr_loss = []
     clas_loss = []
-    model.eval()
     for iter_num, data in enumerate(val_data):
         if iter_num >= 1:
             break
