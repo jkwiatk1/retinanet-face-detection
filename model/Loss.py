@@ -86,12 +86,12 @@ class RetinaNetLoss(nn.Module):
                     alpha_factor = torch.ones(predict_labels.shape, device='cuda') * self.alpha
                 else:
                     alpha_factor = torch.ones(predict_labels.shape) * self.alpha
-                    alpha_factor = 1. - alpha_factor
-                    focal_weight = predict_labels
-                    focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
-                    bce = -(torch.log(1.0 - predict_labels))
-                    cls_loss = focal_weight * bce
-                    classification_losses.append(cls_loss.sum())
+                alpha_factor = 1. - alpha_factor
+                focal_weight = predict_labels
+                focal_weight = alpha_factor * torch.pow(focal_weight, self.gamma)
+                bce = -(torch.log(1.0 - predict_labels))
+                cls_loss = focal_weight * bce
+                classification_losses.append(cls_loss.sum())
 
                 if torch.cuda.is_available():
                     regression_losses.append(torch.tensor(0).float().cuda())
