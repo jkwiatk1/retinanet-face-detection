@@ -1,7 +1,26 @@
+# Intro
+The project created in a two-person team. Implementation of RetinaNet architecture in a face detection task. Training and evaluation on a Wider dataset.   
+* **project documentation**: https://github.com/jkwiatk1/retinanet-face-detection/blob/main/data/Dokumentacja_ko%C5%84cowa_GSN.pdf 
+* **result presentation**: https://github.com/jkwiatk1/retinanet-face-detection/blob/main/data/GSN%20-%20Etap%203.pptx
+
+# Results
+### Images
+* normal: <br>
+![images](data/images_res/image1.png)
+
+* With augumentation: <br>
+![images](data/images_res/rotated_image1.png)
+
+### Training:
+* training loss: <br>
+![images](data/images_res/loss60.png)
+
+* coco metrics: <br>
+![images](data/images_res/loss60.png)
+
 # RetinaNet for Face Detection
 * white paper: [link](https://arxiv.org/pdf/1708.02002v2.pdf)
 * article: [link](https://towardsdatascience.com/review-retinanet-focal-loss-object-detection-38fba6afabe4)
-* pytorch_use: [link](https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.retinanet_resnet50_fpn.html#torchvision.models.detection.retinanet_resnet50_fpn)
 
 ### RetinaNet architecture 
 ![images](data/images/retinanet_arch.jpg)
