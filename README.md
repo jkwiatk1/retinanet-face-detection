@@ -16,7 +16,7 @@ The project created in a two-person team. Implementation of RetinaNet architectu
 ![images](data/images_res/loss60.png)
 
 * coco metrics: <br>
-![images](data/images_res/loss60.png)
+![images](data/images_res/metric_60.png)
 
 # RetinaNet for Face Detection
 * white paper: [link](https://arxiv.org/pdf/1708.02002v2.pdf)
